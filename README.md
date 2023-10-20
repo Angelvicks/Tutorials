@@ -2,7 +2,7 @@
 This is a repository for all the tutorials I learned at Mavou Consulting in order to not forget and come back to it later
 
 # How to forward WSL port to Host port
-Active powershell script withe command below
+Active powershell script with this command; 
 Get-ExecutionPolicy
 
 ## Forward port
