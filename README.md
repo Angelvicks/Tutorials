@@ -5,7 +5,7 @@ This is a repository for all the tutorials I learned at Mavou Consulting in orde
 Active powershell script withe command below
 Get-ExecutionPolicy
 
-# Forward port
+## Forward port
 See WSL IP (ifconfig in wsl distri) or :
 
 
