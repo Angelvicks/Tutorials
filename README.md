@@ -39,3 +39,5 @@ kubectl apply -f ingress-nginx-controller-V1_1_3-installer.yml
 
 Verify installation
 kubectl --namespace ingress-nginx get pod
+
+The end for now
