@@ -30,6 +30,7 @@ Example:
 - Make sure you provide a strong password for the gitlab password configuration because there is a validation of the password in the interface
 - Export the port of ingress from the virtual machine to be able to be accessible on the physical machine. Use the commands above, then you can access it through the browser with the port you provided.
 - Install ingress as well with the following commands;
+
 1- Pull ingress-nginx-controller v1.1.3
 sudo ctr -n=k8s.io image pull k8s.gcr.io/ingress-nginx/controller:v1.1.3
 sudo ctr -n=k8s.io image pull k8s.gcr.io/ingress-nginx/kube-webhook-certgen:v1.1.1
