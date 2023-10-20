@@ -22,6 +22,9 @@ Example:
 
 ## Authorize port in the firewall
 New-NetFirewallRule -DisplayName "WSL2 Port Bridge" -Direction Inbound -Action Allow -Protocol TCP -LocalPort [port list]
+The command creates a new firewall rule named "WSL2 Port Bridge." By executing this command, you are allowing incoming TCP traffic on the specified ports through the Windows Firewall. This ensures that the ports are accessible and can receive incoming connections.
+
+Please note that you need administrative privileges to run this command. 
 Example:
 
 [RUN] New-NetFirewallRule -DisplayName "WSL2 Port Bridge" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 80,8080,443
