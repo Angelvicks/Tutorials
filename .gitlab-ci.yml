@@ -31,3 +31,56 @@ deploy-job:      # This job runs in the deploy stage.
     - apt-get install -y openssh-client
     - scp -r -P 10022 -o "PasswordAuthentication=yes" /path/odoo-modules/addons master@139.99.148.46:/home/master/volume/odoo/addons
     - kubectl rollout restart pod odoo-deployment-8689c8bdd7-69ppm
+
+#Second code to run the build stgage for a pipeline on gitlab on odoo modules
+
+stages:          # List of stages for jobs, and their order of execution
+  - build
+
+build-job:       # This job runs in the build stage, which runs first.
+  stage: build
+  script:
+    - echo "Clone project ..."
+    # We are cloning the project using a specific branch on gitlab with -b, CI_JOB_TOKEN is a generated token variable on gitlab so don't change it
+    - git clone -b Angel http://gitlab-ci-token:$CI_JOB_TOKEN@192.168.100.100:10080/mavou-dev/odoo-modules.git
+    
+    - echo "Copy addons file in Odoo pod" #The next script just gets the specific name of the pod with the namespace given
+    - POD=$(kubectl --namespace=odoo get pod -l app=odoo-app -o jsonpath="{.items[0].metadata.name}")
+    
+    # Copy the folder odoo-modules to the pod with namespace odoo inside its folder mnt/extra-addons
+    - kubectl cp  odoo-modules/addons odoo/$POD:/mnt/extra-addons
+
+    #In the kubectl command, the exec command is used to execute a command inside a running container in a Pod.
+    #By using kubectl exec, you can gain access to a running container and execute commands within that container.
+    # This command will execute ls -a /mnt/extra-addons/addons within the specified Pod, and it will list all files and directories, 
+    # including hidden ones (directories and files whose names start with a dot), present in the /mnt/extra-addons/addons directory.
+    - kubectl --namespace=odoo exec $POD -- ls -a /mnt/extra-addons/addons
+    
+    # The script essentially moves the contents of /mnt/extra-addons/addons/ 
+    # To individual directories within /mnt/extra-addons/ and removes the original addons/ directory.
+    # Checks if the directory /mnt/extra-addons/addons/ exists.
+    # If the directory exists, it performs a loop over each file or directory within /mnt/extra-addons/addons/.
+    # For each module, it extracts the module name using basename and creates a corresponding directory under /mnt/extra-addons/.
+    # It then recursively copies the contents of each module to the corresponding directory under /mnt/extra-addons/
+    # After copying, it removes the entire /mnt/extra-addons/addons/ directory.
+    # If the directory /mnt/extra-addons/addons/ does not exist, it displays an error message.
+    - kubectl --namespace=odoo exec $POD -- bash -c 'if [ -d "/mnt/extra-addons/addons/" ]; then for module in /mnt/extra-addons/addons/*; 
+       do module_name=$(basename "$module"); mkdir -p "/mnt/extra-addons/$module_name"; 
+       cp -r "$module/" "/mnt/extra-addons/$module_name/"; done; rm -r /mnt/extra-addons/addons; 
+       else echo "The directory /mnt/extra-addons/addons/ n'\''does not exist."; fi'
+       
+    - echo "Restart pod"
+
+    # Executes a shell script inside the specified namespace and Pod using kubectl exec.
+    # Checks if the line containing "addons_path" exists in the file /etc/odoo/odoo.conf using grep -q.
+    # If the line is not found (the ! grep -q condition), it appends the line "addons_path=/mnt/extra-addons" 
+    # To the file /etc/odoo/odoo.conf using echo "addons_path=/mnt/extra-addons" >> /etc/odoo/odoo.conf
+    - kubectl exec --namespace=odoo $POD -- bash -c 'if ! grep -q "addons_path" /etc/odoo/odoo.conf; then echo "addons_path=/mnt/extra-addons" >> /etc/odoo/odoo.conf; fi'
+
+    # Restart the deployment with name name odoo under the namespace odoo
+    - kubectl --namespace=odoo rollout restart deployment/odoo
+    - echo "Odoo restarted"
+    
+    # Get th elogs of the pod u retreived from the variable $POD above under the namespace odoo
+    - kubectl --namespace=odoo logs $POD
+    #- kubectl apply -f manifest/odoo-deploy.yml
