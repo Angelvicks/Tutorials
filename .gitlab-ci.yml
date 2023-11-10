@@ -85,7 +85,7 @@ build-job:       # This job runs in the build stage, which runs first.
     - kubectl --namespace=odoo logs $POD
     #- kubectl apply -f manifest/odoo-deploy.yml
 
-    # Fichier .gitlab-ci.yml
+    #  Third .gitlab-ci.yml file
 stages:
   - build
 
@@ -95,6 +95,7 @@ build-job:
     # Run the script commented below with the function file, fonction.sh
     # The variable $CI_COMMIT_REF_NAME, is a gitlab variable to take the branch name of the user automacticaly 
     # and do a clone from that branch to the gitlab executor using the gitlab runner installed for the project
+    # The branch or tag name for which project is built, for the variable $CI_COMMIT_REF_NAME.
     #- echo "Clone project ..."
     #- git clone -b $CI_COMMIT_REF_NAME  http://gitlab-ci-token:$CI_JOB_TOKEN@192.168.100.100:10080/mavou-dev/odoo-modules.git
     #- source odoo-modules/fonction.sh
@@ -104,6 +105,21 @@ build-job:
     - kubectl apply -f manifest/odoo-deploy.yml
     - kubectl get all
     - echo "Compile complete."
+    
+# Fourth .gitlab-ci.yml file, including a revised code
+#This code will work with function .deploy_module.sh
+stages:          # List of stages for jobs, and their order of execution
+  - build
 
-
+build-job:       # This job runs in the build stage, which runs first.
+  stage: build
+  script:
+    - echo "Clone project ..."
+    # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html, Use this link to see all the available variables gitlab predefined already
+    # Variable $CI_COMMIT_BRANCH, takes the commit branch name. Available in branch pipelines, including pipelines for the default branch.
+    # Not available in merge request pipelines or tag pipelines.
+    # Variable $CI_PROJECT_NAME, take The name of the directory for the project. 
+    # For example if the project URL is gitlab.example.com/group-name/project-1, CI_PROJECT_NAME is project-1.
+    - git clone -b $CI_COMMIT_BRANCH http://gitlab-ci-token:$CI_JOB_TOKEN@192.168.100.100:10080/mavou-dev/odoo-modules.git
+    - chmod +x $CI_PROJECT_NAME/.deploy_module.sh && source $CI_PROJECT_NAME/.deploy_module.sh $CI_PROJECT_NAME $NAMESPACE_DEV $APP_DEV $DEPLOYMENT_DEV
     
