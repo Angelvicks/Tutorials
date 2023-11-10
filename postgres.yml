@@ -1,0 +1,125 @@
+#Creation of namespace.yml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgres
+
+---
+# Creation of postgres_statefulset.yml
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-statefulset
+  namespace: postgres
+  labels:
+    app: app-postgres
+spec:
+  replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: app-postgres
+  template:
+    metadata:
+      name: postgres-pod
+      labels:
+        app: app-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: odoo
+            - name: POSTGRES_USER
+              value: odoo
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - mountPath: "/var/lib/postgresql/data/pgdata"
+              name: postgres
+
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres
+        namespace: postgres
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: postgres-storage-class
+        volumeName: pv-postgres 
+
+---
+# Creation of postgres_service.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-postgres
+  namespace: postgres
+spec:
+  type: NodePort
+  selector:
+    app: app-postgres
+    # postgres-app
+  ports:
+      # By default and for convenience, the `targetPort` is set to the same value as the `port` field.
+    - port: 5432
+      targetPort: 5432
+      # Optional field
+      # By default and for convenience, the Kubernetes control plane will allocate a port from a range (default: 30000-32767)
+      nodePort: 30008
+      #30007
+
+---
+# Creation of postgres_storageclass.yml
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: postgres-storage-class
+  namespace: postgres
+reclaimPolicy: Retain
+provisioner: microk8s.io/hostpath
+volumeBindingMode: WaitForFirstConsumer
+
+
+---
+# Creation of postgres-pv.yml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-postgres
+  namespace: postgres
+  labels:
+    type: local
+spec:
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  capacity:
+    storage: 1Gi
+  storageClassName: postgres-storage-class
+  local:
+    path: /home/master/volume/postgres-data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+              - k8s-master

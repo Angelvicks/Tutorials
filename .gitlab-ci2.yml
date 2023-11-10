@@ -1,0 +1,45 @@
+stages:          # List of stages for jobs, and their order of execution
+  - build
+
+build-job:       # This job runs in the build stage, which runs first.
+  stage: build
+  script:
+    - echo "Clone project ..."
+    - git clone -b Angel http://gitlab-ci-token:$CI_JOB_TOKEN@192.168.100.100:10080/mavou-dev/odoo-modules.git
+    - echo "Copy addons file in Odoo pod"
+    - POD=$(kubectl --namespace=odoo get pod -l app=odoo-app -o jsonpath="{.items[0].metadata.name}")
+
+    - kubectl cp  odoo-modules/addons odoo/$POD:/mnt/extra-addons
+
+    - kubectl --namespace=odoo exec $POD -- ls -a /mnt/extra-addons/addons
+
+    - kubectl --namespace=odoo exec $POD -- bash -c 'if [ -d "/mnt/extra-addons/addons/" ]; then for module in /mnt/extra-addons/addons/*; 
+       do module_name=$(basename "$module"); mkdir -p "/mnt/extra-addons/$module_name"; 
+       cp -r "$module/" "/mnt/extra-addons/$module_name/"; done; rm -r /mnt/extra-addons/addons; 
+       else echo "The directory /mnt/extra-addons/addons/ n'\''does not exist."; fi'
+
+    - echo "Restart pod"
+    - kubectl exec --namespace=odoo $POD -- bash -c 'if ! grep -q "addons_path" /etc/odoo/odoo.conf; then echo "addons_path=/mnt/extra-addons" >> /etc/odoo/odoo.conf; fi'
+    
+    - kubectl --namespace=odoo rollout restart deployment/odoo
+    - echo "Odoo restarted"
+    - kubectl --namespace=odoo logs $POD
+    #- kubectl apply -f manifest/odoo-deploy.yml
+
+stages:          # List of stages for jobs, and their order of execution
+  - build
+
+build-job:       # This job runs in the build stage, which runs first.
+  stage: build
+  script:
+    - echo "Clone project ..."
+    - git clone -b Angel http://gitlab-ci-token:$CI_JOB_TOKEN@192.168.100.100:10080/mavou-dev/odoo-modules.git
+    - echo "Copy addons file in Odoo pod"
+    - POD=$(kubectl --namespace=odoo get pod -l app=odoo-app -o jsonpath="{.items[0].metadata.name}")
+    - for module in odoo-modules/addons/*;
+        do kubectl cp  $module odoo/$POD:/mnt/extra-addons/; done;
+    - kubectl exec --namespace=odoo $POD -- bash -c 'if ! grep -q "addons_path" /etc/odoo/odoo.conf; then echo "addons_path=/mnt/extra-addons" >> /etc/odoo/odoo.conf; fi'
+    - echo "Restart pod"
+    - kubectl --namespace=odoo rollout restart deployment/odoo
+    - echo "Odoo restarted"
+    - kubectl --namespace=odoo logs $POD

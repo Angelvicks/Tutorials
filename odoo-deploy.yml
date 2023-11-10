@@ -1,0 +1,220 @@
+# Creation of deployment.yml 
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: odoo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: odoo-deployment
+  template:
+    metadata:
+      labels:
+        app: odoo-deployment
+    spec:
+      volumes: 
+        - name: addons
+          persistentVolumeClaim:
+            claimName: pvc-addons
+        - name: config
+          persistentVolumeClaim:
+            claimName: config-pvc
+        - name: webdata
+          persistentVolumeClaim:
+            claimName: webdata-pvc
+      
+      containers:
+        - name: odoo
+          image: odoo:16.0
+          securityContext:
+            privileged: true
+          #imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8069
+          env:
+            - name: HOST
+              value: "192.168.100.100"     
+            - name: PORT
+              value: "30007"
+#            - name: POSTGRES_DB  [Will be automatically created]
+#              value: odoo-db
+            - name: POSTGRES_USER
+              value: odoo
+            - name: POSTGRES_PASSWORD
+              value: odoo
+          volumeMounts:
+            - mountPath: "/mnt/extra-addons"
+              name: addons
+            - mountPath: "/etc/odoo"
+              name: config
+            - mountPath: "/var/lib/odoo"
+              name: webdata
+            
+
+---
+# Creation of service.yml 
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: odoo-service
+spec:
+  type: NodePort
+  selector:
+    app: odoo-deployment
+  ports:
+      # By default and for convenience, the `targetPort` is set to the same value as the `port` field.
+    - port: 8069
+      targetPort: 8069
+      # Optional field
+      # By default and for convenience, the Kubernetes control plane will allocate a port from a range (default: 30000-32767)
+      nodePort: 30009
+
+---
+# Creation of storageclass-odoo.yml 
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: storageclass-odoo
+reclaimPolicy: Retain
+provisioner:  microk8s.io/hostpath
+volumeBindingMode: WaitForFirstConsumer
+
+---
+# Creation of pv-addons.yml 
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-addons
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 2Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: storageclass-odoo
+  local:
+    path: /home/master/volume/odoo-volume/addons
+  nodeAffinity: 
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+              - k8s-master
+
+---
+# Creation of pv-webdata.yml 
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: webdata-pv
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 2Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: storageclass-odoo
+  local:
+    path: /home/master/volume/odoo-volume/web-data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+              - k8s-master
+
+---
+# Creation of pv-config.yml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-config
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 2Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: storageclass-odoo
+  local:
+    path: /home/master/volume/odoo-volume/config
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+              - k8s-master
+
+---
+# Creation of pvc-addons.yml
+
+#Static Provisioning
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-addons
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: storageclass-odoo
+  volumeName: pv-addons
+
+
+---
+# Creation of pvc-config.yml
+
+#Static Provisioning
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: config-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: storageclass-odoo
+  volumeName: pv-config
+
+---
+# Creation of pvc-webdata.yml
+
+#Static Provisioning
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: webdata-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: storageclass-odoo
+  volumeName: webdata-pv
