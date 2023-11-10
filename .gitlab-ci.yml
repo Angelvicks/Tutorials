@@ -84,3 +84,26 @@ build-job:       # This job runs in the build stage, which runs first.
     # Get th elogs of the pod u retreived from the variable $POD above under the namespace odoo
     - kubectl --namespace=odoo logs $POD
     #- kubectl apply -f manifest/odoo-deploy.yml
+
+    # Fichier .gitlab-ci.yml
+stages:
+  - build
+
+build-job:
+  stage: build
+  script:
+    # Run the script commented below with the function file, fonction.sh
+    # The variable $CI_COMMIT_REF_NAME, is a gitlab variable to take the branch name of the user automacticaly 
+    # and do a clone from that branch to the gitlab executor using the gitlab runner installed for the project
+    #- echo "Clone project ..."
+    #- git clone -b $CI_COMMIT_REF_NAME  http://gitlab-ci-token:$CI_JOB_TOKEN@192.168.100.100:10080/mavou-dev/odoo-modules.git
+    #- source odoo-modules/fonction.sh
+    #- |
+     # run_build_job "odoo" "odoo-app" "odoo"
+    - echo "Compiling the code..."
+    - kubectl apply -f manifest/odoo-deploy.yml
+    - kubectl get all
+    - echo "Compile complete."
+
+
+    
