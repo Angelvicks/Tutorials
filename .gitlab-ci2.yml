@@ -43,3 +43,25 @@ build-job:       # This job runs in the build stage, which runs first.
     - kubectl --namespace=odoo rollout restart deployment/odoo
     - echo "Odoo restarted"
     - kubectl --namespace=odoo logs $POD
+
+# This gitlab-ci is a modification of the one above using variables defined on the gitlab interface
+# The variable, $CI_JOB_TOKEN, is a defined variable on gitlab, while these variable; $NAMESPACE_DEV, $DEPLOYMENT_DEV are
+# Self-defined varibles done on the settings/ci_cd page of the project where u can defined a specific variable so that gitlab can recognize the variable
+# Anytime its sees that variable on your .gitlab-ci file in ur running project.
+stages:          # List of stages for jobs, and their order of execution
+  - build
+
+build-job:       # This job runs in the build stage, which runs first.
+  stage: build
+  script:
+    - echo "Clone project ..."
+    - git clone -b Angel http://gitlab-ci-token:$CI_JOB_TOKEN@192.168.100.100:10080/mavou-dev/odoo-modules.git
+    - echo "Copy addons file in Odoo pod"
+    - POD=$(kubectl --namespace=$NAMESPACE_DEV get pod -l app=$APP_DEV -o jsonpath="{.items[0].metadata.name}")
+    - for module in odoo-modules/addons/*;
+        do kubectl cp  $module $NAMESPACE_DEV/$POD:/mnt/extra-addons/; done;
+    - kubectl exec --namespace=$NAMESPACE_DEV $POD -- bash -c 'if ! grep -q "addons_path" /etc/odoo/odoo.conf; then echo "addons_path=/mnt/extra-addons" >> /etc/odoo/odoo.conf; fi'
+    - echo "Restart pod"
+    - kubectl --namespace=$NAMESPACE_DEV rollout restart deployment/$DEPLOYMENT_DEV
+    - echo "Odoo restarted"
+    - kubectl --namespace=$NAMESPACE_DEV logs $POD
