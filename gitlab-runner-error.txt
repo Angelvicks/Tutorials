@@ -5,3 +5,45 @@ gitlab-rake gitlab:doctor:secrets VERBOSE=1 It will all the errors inside gitlab
 To enter the pod use the following command; kubectl exec --stdin --tty <pod-name> -- /bin/bash
 Replace <pod-name> with the name of the pod you wish to enter and apply commands
 
+# Fix Fix_gitlab_error500-runner
+## 1- Enter in pod
+<code>kubectl exec --stdin --tty $PODNAME -- /bin/bash</code>
+
+## 2- Scan error
+<code>gitlab-rake gitlab:doctor:secrets VERBOSE=1</code>
+
+## 3- Enter rails console
+<code>gitlab-rails dbconsole</code>
+### a. Reset CI/CD variables
+<code>SELECT * FROM public."ci_group_variables";</code><br/>
+<code>SELECT * FROM public."ci_variables";</code><br/>
+<code>DELETE FROM ci_group_variables;</code><br/>
+<code>DELETE FROM ci_variables;</code>
+    
+### b. Reset runner registration tokens
+<p>-- Clear project tokens</p>
+<code>UPDATE projects SET runners_token = null, runners_token_encrypted = null;</code>
+<p>-- Clear group tokens</p>
+<code>UPDATE namespaces SET runners_token = null, runners_token_encrypted = null;</code>
+<p>-- Clear instance tokens</p>
+<code>UPDATE application_settings SET runners_registration_token_encrypted = null;</code><br/>
+<code>UPDATE application_settings SET encrypted_ci_jwt_signing_key = null;</code>
+<p>-- Clear runner tokens</p>
+<code>UPDATE ci_runners SET token = null, token_encrypted = null;</code>
+    
+### c. Fix project integrations
+<p>-- truncate web_hooks table</p>
+<code>TRUNCATE web_hooks CASCADE;</code>
+
+### d. Reset setting
+<code>settings = ApplicationSetting.last</code><br/>
+<code>settings.update_column(:runners_registration_token_encrypted, nil)</code><br/>
+<code>ApplicationSetting.first.delete</code><br/>
+<code>ApplicationSetting.first</code>
+
+After applying the commands above, re-configure the variable on the CI/CD settings of your gitlab projets to ensure that gitlab-ci yaml file works fine with syntax error in case u have defined variables on ur code.
+### e. Quit rails console
+<code>\q</code>
+
+## 4- Restart Gitlab
+<code>gitlab-ctl restart</code>
