@@ -1,0 +1,102 @@
+Methods to install Velero, which gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes.
+
+Votre nom d'utilisateur S3 : user-N7VxrjvvK9Um
+Votre clé d'accès S3 : c3064a9c325343dca2d6656a019421cc
+Votre description :S3
+Votre clé secrète S3 :8633ce034d5145fabe95a3a1d6272d67
+
+ID: vs3
+Localisation: BHS
+
+Endpoint: https://s3.bhs.io.cloud.ovh.net/
+Virtual Hosted-Style : https://vs3.s3.bhs.io.cloud.ovh.net/
+
+
+providers:
+  - name: s3
+    config:
+      bucket: vs3
+      region: BHS
+      accessKeyID: c3064a9c325343dca2d6656a019421cc
+      secretAccessKey: 8633ce034d5145fabe95a3a1d6272d67
+
+Another Method
+
+# Copy the config entry below in your rclone configuration file.
+[BackupStorageS3]
+type = s3
+provider = Other
+env_auth = false
+access_key_id = c3064a9c325343dca2d6656a019421cc
+secret_access_key = 8633ce034d5145fabe95a3a1d6272d67
+acl = private
+region = bhs
+location_constraint = bhs
+# API endpoint
+# S3 standard endpoint
+endpoint = https://s3.bhs.io.cloud.ovh.net/
+# S3 high-perf endpoint
+endpoint = https://s3.bhs.perf.cloud.ovh.net/
+
+
+Another Method
+
+velero install \
+  --features=EnableCSI \
+  --provider aws \
+  --plugins velero/velero-plugin-for-aws:v1.6.0,velero/velero-plugin-for-csi:v0.4.0 \
+  --bucket $BUCKET \
+  --secret-file ./credentials-velero \
+  --backup-location-config region=$REGION,s3ForcePathStyle="true",s3Url=https://s3.bhs.io.cloud.ovh.net \
+  --snapshot-location-config region=$REGION,enableSharedConfig=true
+
+For this method, create a file called credentials-velero inside the online server you are working with, and paste the secret informations listed below;
+aws_access_key_id=c3064a9c325343dca2d6656a019421cc
+aws_secret_access_key=8633ce034d5145fabe95a3a1d6272d67
+
+After applying the above; Use this link https://docs.trilio.io/kubernetes/appendix/csi-drivers/installing-volumesnapshot-crds, to apply kind volumesnaphot. Read the link to understand how to do it.
+You will be apply an online kubernetes file that is of kind volumesnapshot
+
+After that you should now install the backup installation with the following commands;
+velero backup create cluster-backup-15-11-2023
+
+velero backup describe cluster-backup-15-11-2023
+
+velero backup logs cluster-backup-15-11-2023
+
+Read the following link to know how to install backup on ovh, https://help.ovhcloud.com/csm/en-public-cloud-kubernetes-backing-up-cluster-velero?id=kb_article_view&sysparm_article=KB0049625
+
+Another tutorial 
+BUCKET=vs3
+REGION=BHS
+
+velero install \
+  --features=EnableCSI \
+  --provider aws \
+  --plugins velero/velero-plugin-for-aws:v1.6.0,velero/velero-plugin-for-csi:v0.4.0 \
+  --bucket $BUCKET \
+  --secret-file ./credentials-velero \
+  --backup-location-config region=$REGION,s3ForcePathStyle="true",s3Url=https://s3.$REGION.cloud.ovh.net \
+  --snapshot-location-config region=$REGION,enableSharedConfig=true
+
+
+velero backup-location create backups-primary \
+    --provider aws \
+    --bucket $BUCKET \
+    --config region=$REGION \
+    --default
+
+
+velero snapshot-location create snapshot-vs3 \
+    --provider aws \
+    --config region=$REGION
+
+
+velero backup create cluster-backup-15-11-2023 \
+    --storage-location backups-primary \
+    --volume-snapshot-locations snapshot-vs3
+
+
+kubectl delete backups cluster-backup-15-11-2023 -n velero
+
+velero uninstall
