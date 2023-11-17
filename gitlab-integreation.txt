@@ -1,0 +1,5 @@
+To configure gitlab for to be connected to Jira and Slack applications use the link below;
+
+https://support.atlassian.com/jira-software-cloud/docs/use-jira-cloud-for-slack/
+
+https://about.gitlab.com/solutions/jira/
