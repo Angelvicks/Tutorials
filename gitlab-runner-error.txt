@@ -1,0 +1,6 @@
+# How to fix error 500 when we want to enter gitlab runner settings
+ Apply first this command inside the pod to see all the errors generated from ur gitlab installations;
+gitlab-rake gitlab:doctor:secrets VERBOSE=1 It will all the errors inside gitlab.
+
+To enter the pod use the following command; kubectl exec --stdin --tty <pod-name> -- /bin/bash
+Replace <pod-name> with the name of the pod you wish to enter and apply commands
