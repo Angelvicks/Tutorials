@@ -1,0 +1,168 @@
+#This file contains the new configuration of postgres needed to install postgres while specifying the configMap file using kubernetes
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: odoo-postgres-service-init
+spec:
+  selector:
+    app: odoo-postgres-init
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: odoo-service-init
+spec:
+  selector:
+    app: odoo-init
+  ports:
+    - protocol: TCP
+      port: 8069
+      targetPort: 8069
+      nodePort: 30015
+  type: NodePort
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: odoo-pv-web-data
+  labels:
+    type: local
+spec:
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  capacity:
+    storage: 2Gi
+  storageClassName: storageclass-odoo
+  local:
+    path: /home/master/volume/pre-production/odoo/web-data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+              - k8s-master
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv-data
+  labels:
+    type: local
+spec:
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  capacity:
+    storage: 2Gi
+  storageClassName: storageclass-odoo
+  local:
+    path: /home/master/volume/pre-production/postgres/data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+              - k8s-master
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: odoo-pvc-web-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: storageclass-odoo
+  volumeName: odoo-pv-web-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: storageclass-odoo
+  volumeName: postgres-pv-data
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: odoo-postgres-pod-init
+  labels:
+    app: odoo-postgres-init
+spec:
+  containers:
+    - name: postgres-init
+      image: postgres:15
+      env:
+        - name: POSTGRES_USER
+          value: odoo
+        - name: POSTGRES_PASSWORD
+          value: odoo
+        - name: POSTGRES_DB
+          value: postgres
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+      volumeMounts:
+        - name: postgres-data-volume
+          mountPath: /var/lib/postgresql/data/pgdata
+  volumes:
+    - name: postgres-data-volume
+      persistentVolumeClaim:
+        claimName: postgres-pvc-data
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: odoo-pod-init
+  labels:
+    app: odoo-init
+spec:
+  initContainers:
+    - name: wait-for-postgres
+      image: bitnami/kubectl:1.27.7-debian-11-r0
+      command: ["sh", "-c", "until kubectl --namespace pre-production get pod odoo-postgres-pod-init -o jsonpath='{.status.phase}' | grep -q Running; do sleep 1; done"]
+  containers:
+    - name: odoo-init
+      image: odoo:16
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          odoo --init base --db_host $HOST --db_port $PORT --db_user $USER --db_password $PASSWORD --database $DATABASE --dev all
+      ports:
+        - containerPort: 8069
+      env:
+        - name: HOST
+          value: odoo-postgres-service-init
+        - name: PORT
+          value: "5432"
+        - name: USER
+          value: odoo
+        - name: PASSWORD
+          value: odoo
+        - name: DATABASE
+          value: postgres
+      volumeMounts:
+        - name: web-data-volume
+          mountPath: /var/lib/odoo
+  volumes:
+    - name: web-data-volume
+      persistentVolumeClaim:
+        claimName: odoo-pvc-web-data
